@@ -33,7 +33,6 @@ class LocaleComparison(object):
                 'Filtered export by locale(s) {}'.format(localeIDs), 'Filtered')
         localeList = localeIDs.split(',')
         result.localeIDs = localeIDs
-        result.localeExports = {}
         for le in self.localeExports:
             lev = self.localeExports[le]
             lr = lev['locale_record']
@@ -42,40 +41,46 @@ class LocaleComparison(object):
                 # would be better
                 filterKey = str(le) + '__' + localeID 
                 if localeID in lr:
-                    result.localeExports[filterKey] = {}
-                    result.localeExports[filterKey]['locale_record'] = lr[localeID]
-                    result.localeExports[filterKey]['platform_sig'] = lev['platform_sig']
+                    if not le in result.platforms:
+                        result.platforms[le] = {}
+                        result.platforms[le]['platform_sig'] = lev['platform_sig']
+                        result.platforms[le]['locale_exports'] = {}
+                    result.platforms[le]['locale_exports'][localeID] = lr[localeID]
         return result
 
-    def initLocaleEntry(self, diff, source, key):
-        localeEntry = {}
-        localeEntry['platform_sig'] = \
-                  source.localeExports[key]['platform_sig']
-        diff.localeExports[key] = localeEntry
+    def initLocaleEntry(self, diff, source, platformKey, localeKey):
+        platformEntry = {}
+        if not platformKey in diff.platforms:
+            diff.platforms[platformKey] = {}
+            diff.platforms[platformKey]['platform_sig'] = source.platforms[platformKey]['platform_sig']
+            diff.platforms[platformKey]['locale_exports'] = {}
+        if not localeKey in diff.platforms[platformKey]['locale_exports']:
+            diff.platforms[platformKey]['locale_exports'][localeKey] = {}
+        
 
     def diff(self,localeIDs):
         filtered = self.filter(localeIDs)
-        if len(filtered.localeExports) == 0:
+        if len(filtered.platforms) == 0:
             return filtered
-        firstKey = list(filtered.localeExports)[0]
-        firstLR = filtered.localeExports[firstKey]['locale_record']
-        firstPlatform = filtered.localeExports[firstKey]['platform_sig']
+        firstKey = list(filtered.platforms)[0]
+        firstPlatform = filtered.platforms[firstKey]
+        firstLocaleKey = list(firstPlatform['locale_exports'])[0]
+        firstLR = firstPlatform['locale_exports'][firstLocaleKey]
         result  = LocaleFilter('Filtered export {} with attribute diff'.format(localeIDs),
                                 'Attribute diff')
         result.localeIDs = localeIDs
-        result.localeExports = {}
+        result.platforms = {}
         for attr in firstLR:
-            if attr == 'platform_sig':
-                continue
-            for le in filtered.localeExports:
-                lev = filtered.localeExports[le]['locale_record']
-                if firstLR[attr] != lev[attr]:
-                    if not le in result.localeExports:
-                        self.initLocaleEntry(result, filtered, le)
-                    if not firstKey in result.localeExports:
-                        self.initLocaleEntry(result, filtered, firstKey )
-                    result.localeExports[le][attr] = lev[attr]
-                    result.localeExports[firstKey][attr] = firstLR[attr]
+            for platformKey in filtered.platforms:
+                platformRecord = filtered.platforms[platformKey]
+                for le in platformRecord['locale_exports']:
+                    lev = platformRecord['locale_exports'][le]
+                    if firstLR[attr] != lev[attr]:
+                        self.initLocaleEntry(result, filtered, platformKey, le)
+                        self.initLocaleEntry(result, filtered, firstKey, 
+                                                    firstLocaleKey )
+                        result.platforms[platformKey]['locale_exports'][le][attr] = lev[attr]
+                        result.platforms[firstKey]['locale_exports'][firstLocaleKey][attr] = firstLR[attr]
         return result
 
 

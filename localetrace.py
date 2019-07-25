@@ -57,7 +57,7 @@ class LocaleBasicStringExport(LocaleExporter):
 
 class LocaleJsonExporter(LocaleExporter):
     def export(self,localeExport):
-        return json.dumps(localeExport.__dict__)
+        return json.dumps(localeExport.__dict__, ensure_ascii=False)
 
 
 def changeLocale(localeStr,localeExport):
