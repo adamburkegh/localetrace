@@ -54,11 +54,11 @@ class LocaleDiffByAttr(LocaleDiff):
         if not es in self.attrs[attr]:
             self.attrs[attr][es] = {}
         if not lkey in self.attrs[attr][es]:
-            self.attrs[attr][es][lkey] = {'platform_use': [] }
-        ct_use = self.attrs[attr][es][lkey]['platform_use']
+            self.attrs[attr][es][lkey] = []
+        ct_use = self.attrs[attr][es][lkey]
         if not plk in ct_use:
             ct_use += [plk]
-            self.attrs[attr][es][lkey]['platform_use'] = ct_use
+            self.attrs[attr][es][lkey] = ct_use
         if not plk in self.platforms:
             self.platforms[plk] = source.platforms[plk]['platform_sig']
 
@@ -77,12 +77,12 @@ class LocaleComparison(object):
         self.updateTime = datetime.datetime.now().ctime()
         self.localeExports = {}
 
-    def addLocale(self,localeExport):
-        platform_key = len(self.localeExports)+1
-        self.localeExports[platform_key] = localeExport.__dict__
-
     def addLocaleDict(self,localeExportDict):
-        platform_key = len(self.localeExports)+1
+        # platform_key = len(self.localeExports)+1
+        platform_sig = localeExportDict['platform_sig'] 
+        platform_key = "{}~{}~{}".format( platform_sig['platform'][:7], 
+                                          platform_sig['python_implementation'],
+                                          platform_sig['python_version'][:3] ) 
         self.localeExports[platform_key] = localeExportDict
 
     def filter(self,localeIDs):
@@ -140,6 +140,7 @@ def initComparison( localeExportFiles ):
 def pretty(obj):
     print (json.dumps( obj.__dict__ , sort_keys=True, indent=4 ) )
 
+
 def main():
     parser = argparse.ArgumentParser("Compare locales held in locale export files")
     parser.add_argument('localeExport',nargs='*')
@@ -147,15 +148,18 @@ def main():
     parser.add_argument('--diff', action='store_true', help='Display only differences. Assumes --filter')
     parser.add_argument('--order', choices=['platform','attribute'], 
                     default='attribute', help='Difference order')
+    parser.add_argument('--format', choices=['plain','json'], 
+                    default='json', help='Output format')
     args = parser.parse_args()
     lc = initComparison(args.localeExport)
+    formatter = pretty
     if args.filter:
         if args.diff:
             diffOrder = {'platform': LocaleDiffByPlatform,
                         'attribute': LocaleDiffByAttr }
-            pretty (lc.diff(args.filter, diffOrder[args.order]) )
+            formatter (lc.diff(args.filter, diffOrder[args.order]) )
         else:
-            pretty (lc.filter(args.filter) ) 
+            formatter (lc.filter(args.filter) ) 
     else: 
         pretty( lc )
 
