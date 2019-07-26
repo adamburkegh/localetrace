@@ -13,6 +13,63 @@ class LocaleFilter(object):
         self.platforms = {}
 
 
+class LocaleDiff(object):
+    def __init__(self,description,comparisonType,localeIDs):
+        LocaleFilter.__init__(self,description,comparisonType)
+        self.localeIDs = localeIDs
+        self.platforms = {}
+
+    def initLocaleEntry(self, source, platformKey, localeKey):
+        None
+
+    def addDiffEntry(self, source, plk1, plk2, lkey1, lkey2, attr, 
+                            entry1, entry2):
+        None
+
+
+class LocaleDiffByPlatform(LocaleDiff):
+    def initLocaleEntry(self, source, platformKey, localeKey):
+        if not platformKey in self.platforms:
+            self.platforms[platformKey] = {}
+            self.platforms[platformKey]['platform_sig'] = source.platforms[platformKey]['platform_sig']
+            self.platforms[platformKey]['locale_exports'] = {}
+        if not localeKey in self.platforms[platformKey]['locale_exports']:
+            self.platforms[platformKey]['locale_exports'][localeKey] = {}
+
+    def addDiffEntry(self, source, plk1, plk2, lkey1, lkey2, attr, 
+                            entry1, entry2):
+        self.initLocaleEntry(source, plk1, lkey1)
+        self.initLocaleEntry(source, plk2, lkey2 )
+        self.platforms[plk1]['locale_exports'][lkey1][attr] = entry1
+        self.platforms[plk2]['locale_exports'][lkey2][attr] = entry2
+
+
+class LocaleDiffByAttr(LocaleDiff):
+    def __init__(self,description,comparisonType,localeIDs):
+        LocaleDiff.__init__(self,description,comparisonType,localeIDs)
+        self.attrs = {}
+
+    def addHalfDiff(self, attr, plk, lkey, entry, source):
+        es = str(entry)
+        if not es in self.attrs[attr]:
+            self.attrs[attr][es] = {}
+        if not lkey in self.attrs[attr][es]:
+            self.attrs[attr][es][lkey] = {'platform_use': [] }
+        ct_use = self.attrs[attr][es][lkey]['platform_use']
+        if not plk in ct_use:
+            ct_use += [plk]
+            self.attrs[attr][es][lkey]['platform_use'] = ct_use
+        if not plk in self.platforms:
+            self.platforms[plk] = source.platforms[plk]['platform_sig']
+
+    def addDiffEntry(self, source, plk1, plk2, lkey1, lkey2, attr, 
+                            entry1, entry2):
+        if not attr in self.attrs:
+            self.attrs[attr] = {}
+        self.addHalfDiff(attr, plk1, lkey1, entry1, source )
+        self.addHalfDiff(attr, plk2, lkey2, entry2, source )
+
+
 class LocaleComparison(object):
     def __init__(self):
         self.description = 'Locale comparison including locale exports'
@@ -37,9 +94,6 @@ class LocaleComparison(object):
             lev = self.localeExports[le]
             lr = lev['locale_record']
             for localeID in localeList:
-                # This filterKey is a little hacky, another level of structure
-                # would be better
-                filterKey = str(le) + '__' + localeID 
                 if localeID in lr:
                     if not le in result.platforms:
                         result.platforms[le] = {}
@@ -48,17 +102,7 @@ class LocaleComparison(object):
                     result.platforms[le]['locale_exports'][localeID] = lr[localeID]
         return result
 
-    def initLocaleEntry(self, diff, source, platformKey, localeKey):
-        platformEntry = {}
-        if not platformKey in diff.platforms:
-            diff.platforms[platformKey] = {}
-            diff.platforms[platformKey]['platform_sig'] = source.platforms[platformKey]['platform_sig']
-            diff.platforms[platformKey]['locale_exports'] = {}
-        if not localeKey in diff.platforms[platformKey]['locale_exports']:
-            diff.platforms[platformKey]['locale_exports'][localeKey] = {}
-        
-
-    def diff(self,localeIDs):
+    def diff(self,localeIDs,diffOrder):
         filtered = self.filter(localeIDs)
         if len(filtered.platforms) == 0:
             return filtered
@@ -66,22 +110,23 @@ class LocaleComparison(object):
         firstPlatform = filtered.platforms[firstKey]
         firstLocaleKey = list(firstPlatform['locale_exports'])[0]
         firstLR = firstPlatform['locale_exports'][firstLocaleKey]
-        result  = LocaleFilter('Filtered export {} with attribute diff'.format(localeIDs),
-                                'Attribute diff')
-        result.localeIDs = localeIDs
-        result.platforms = {}
+        result  = diffOrder(
+                    'Filtered export {} with attribute diff'.format(localeIDs),
+                    'Attribute diff',
+                    localeIDs)
         for attr in firstLR:
             for platformKey in filtered.platforms:
                 platformRecord = filtered.platforms[platformKey]
                 for le in platformRecord['locale_exports']:
                     lev = platformRecord['locale_exports'][le]
                     if firstLR[attr] != lev[attr]:
-                        self.initLocaleEntry(result, filtered, platformKey, le)
-                        self.initLocaleEntry(result, filtered, firstKey, 
-                                                    firstLocaleKey )
-                        result.platforms[platformKey]['locale_exports'][le][attr] = lev[attr]
-                        result.platforms[firstKey]['locale_exports'][firstLocaleKey][attr] = firstLR[attr]
+                        result.addDiffEntry(filtered, platformKey, firstKey, 
+                                            le, firstLocaleKey, attr,
+                                            lev[attr], firstLR[attr] )
         return result
+
+
+
 
 
 def initComparison( localeExportFiles ):
@@ -100,11 +145,15 @@ def main():
     parser.add_argument('localeExport',nargs='*')
     parser.add_argument('--filter', help='Filter by comma-separated locale strings')
     parser.add_argument('--diff', action='store_true', help='Display only differences. Assumes --filter')
+    parser.add_argument('--order', choices=['platform','attribute'], 
+                    default='attribute', help='Difference order')
     args = parser.parse_args()
     lc = initComparison(args.localeExport)
     if args.filter:
         if args.diff:
-            pretty (lc.diff(args.filter) )
+            diffOrder = {'platform': LocaleDiffByPlatform,
+                        'attribute': LocaleDiffByAttr }
+            pretty (lc.diff(args.filter, diffOrder[args.order]) )
         else:
             pretty (lc.filter(args.filter) ) 
     else: 
