@@ -1,3 +1,6 @@
+'''
+Compare locale summary files exported in JSON format by localetrace.
+'''
 
 import argparse
 import datetime
@@ -26,7 +29,8 @@ class LocaleDiff(object):
                             entry1, entry2):
         None
 
-
+# This goes into a bit of ugly dictionary-oriented programming, showing its
+# history as an overgrown debug script
 class LocaleDiffByPlatform(LocaleDiff):
     def initLocaleEntry(self, source, platformKey, localeKey):
         if not platformKey in self.platforms:

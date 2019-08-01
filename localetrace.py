@@ -1,4 +1,6 @@
-# Show or export locale details with the identifying platform details
+'''
+Show or export locale details with the identifying platform details. 
+'''
 
 import argparse
 import json
