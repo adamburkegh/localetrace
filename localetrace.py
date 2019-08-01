@@ -2,7 +2,9 @@
 Show or export locale details with the identifying platform details. 
 '''
 
+from __future__ import print_function
 import argparse
+from io import open
 import json
 import locale
 import platform
@@ -59,28 +61,42 @@ class LocaleBasicStringExport(LocaleExporter):
 
 class LocaleJsonExporter(LocaleExporter):
     def export(self,localeExport):
-        return json.dumps(localeExport.__dict__, ensure_ascii=False)
+        return json.dumps(localeExport.__dict__, ensure_ascii=False )
 
 
-def changeLocale(localeStr,localeExport):
-    locale.setlocale(locale.LC_ALL,localeStr)
+def changeLocale(localeStr,localeExport,encoding=None):
+    if encoding:
+        locale.setlocale(locale.LC_ALL,(localeStr,encoding) )
+    else:
+        locale.setlocale(locale.LC_ALL,localeStr)
     localeExport.recordCurrentLocale(localeStr)
 
-def traceLocale(locales,exporter):
+def traceLocale(locales,exporter,outfile,encoding):
     localeExport = LocaleExport()
     for localeStr in locales:
-        changeLocale(localeStr, localeExport) 
-    print ( exporter.export(localeExport) )
+        changeLocale(localeStr, localeExport,encoding) 
+    output = exporter.export(localeExport)
+    print ( output, file=outfile )
 
 
 def main():
     parser = argparse.ArgumentParser("Make locale details available for review")
     parser.add_argument('localeID', nargs='+')
     parser.add_argument('--format', choices=['json','plain'], default='plain' )
+    parser.add_argument('--outfile' )
+    parser.add_argument('--encoding' )
     args = parser.parse_args()
     exporters = {'json': LocaleJsonExporter(),
                  'plain': LocaleBasicStringExport() }
-    traceLocale( args.localeID, exporters[args.format] )
+    outfile = sys.stdout
+    if args.outfile:
+        if (sys.version_info <= (3, 0)):
+            print('--outfile not available before Python 3')
+            sys.exit(1)
+        outfile = open(args.outfile,'w', encoding='utf-8')
+    traceLocale( args.localeID, exporters[args.format], outfile, args.encoding)
+    if args.outfile:
+        outfile.close()
 
 
 if __name__ == '__main__':

@@ -6,6 +6,7 @@ import argparse
 import datetime
 import json
 import sys
+from io import open
 
 
 
@@ -136,8 +137,8 @@ class LocaleComparison(object):
 def initComparison( localeExportFiles ):
     lc = LocaleComparison()
     for leFile in localeExportFiles:
-        f = open( leFile )
-        le = json.load( f )
+        f = open( leFile, 'r', encoding= 'utf-8' )
+        le = json.load( f, encoding = 'utf-8' )
         lc.addLocaleDict(le)
     return lc
 
